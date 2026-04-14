@@ -88,7 +88,7 @@ pub async fn run_sso_login(cli_config_overrides: CliConfigOverrides, env: SsoEnv
     let sso_config = SsoConfig::for_env(env);
     let codex_home = config.codex_home.clone();
 
-    match start_sso_login(sso_config, codex_home) {
+    match start_sso_login(sso_config, codex_home.to_path_buf()) {
         Ok(server) => {
             eprintln!(
                 "Starting local SSO callback server on http://localhost:{}.\n\
