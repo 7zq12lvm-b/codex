@@ -23,6 +23,7 @@ use tracing::error;
 use tracing::info;
 
 use crate::sso_config::SsoConfig;
+use crate::sso_config::SsoEnv;
 
 // ---------------------------------------------------------------------------
 // Persisted session
@@ -42,7 +43,7 @@ pub struct SsoUserInfo {
     pub avatar: String,
 }
 
-/// On-disk representation stored at `$CODEX_HOME/sso_session.json`.
+/// On-disk representation stored at `$CODEX_HOME/sso_session_<env>.json`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SsoSession {
     /// The environment that produced this session (sit / prod).
@@ -75,17 +76,18 @@ impl SsoSession {
     }
 }
 
-fn sso_session_path(codex_home: &Path) -> PathBuf {
-    codex_home.join("sso_session.json")
+fn sso_session_path_for_env(codex_home: &Path, env: SsoEnv) -> PathBuf {
+    codex_home.join(format!("sso_session_{env}.json"))
 }
 
 pub fn save_sso_session(codex_home: &Path, session: &SsoSession) -> io::Result<()> {
-    if let Some(parent) = sso_session_path(codex_home).parent() {
+    let env = SsoEnv::from_str_loose(&session.env);
+    let path = sso_session_path_for_env(codex_home, env);
+    if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
     let json = serde_json::to_string_pretty(session).map_err(io::Error::other)?;
 
-    let path = sso_session_path(codex_home);
     let mut opts = std::fs::OpenOptions::new();
     opts.create(true).write(true).truncate(true);
     #[cfg(unix)]
@@ -100,24 +102,42 @@ pub fn save_sso_session(codex_home: &Path, session: &SsoSession) -> io::Result<(
 }
 
 pub fn load_sso_session(codex_home: &Path) -> io::Result<Option<SsoSession>> {
-    let path = sso_session_path(codex_home);
+    let path = sso_session_path_for_env(codex_home, SsoEnv::Prod);
     match std::fs::read_to_string(&path) {
         Ok(contents) => {
             let session: SsoSession = serde_json::from_str(&contents).map_err(io::Error::other)?;
             Ok(Some(session))
         }
-        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {
+            let sit_path = sso_session_path_for_env(codex_home, SsoEnv::Sit);
+            match std::fs::read_to_string(&sit_path) {
+                Ok(contents) => {
+                    let session: SsoSession =
+                        serde_json::from_str(&contents).map_err(io::Error::other)?;
+                    Ok(Some(session))
+                }
+                Err(sit_error) if sit_error.kind() == io::ErrorKind::NotFound => Ok(None),
+                Err(sit_error) => Err(sit_error),
+            }
+        }
         Err(e) => Err(e),
     }
 }
 
 pub fn delete_sso_session(codex_home: &Path) -> io::Result<bool> {
-    let path = sso_session_path(codex_home);
-    match std::fs::remove_file(&path) {
-        Ok(()) => Ok(true),
-        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(false),
-        Err(e) => Err(e),
+    let mut removed = false;
+    let paths = [
+        sso_session_path_for_env(codex_home, SsoEnv::Prod),
+        sso_session_path_for_env(codex_home, SsoEnv::Sit),
+    ];
+    for path in paths {
+        match std::fs::remove_file(path) {
+            Ok(()) => removed = true,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
     }
+    Ok(removed)
 }
 
 // ---------------------------------------------------------------------------

@@ -158,6 +158,14 @@ compile_one() {
         log_error "编译产物不存在: $binary"
         exit 1
     fi
+    # 编译产物自带 linker-signed 签名，直接复制/重命名后会被 macOS SIGKILL
+    # 在编译阶段就替换为 ad-hoc 签名，确保后续无论怎么分发都能运行
+    if [[ "$target" == *"-apple-darwin"* ]] && command -v codesign &>/dev/null; then
+        log_info "替换 linker-signed 为 ad-hoc 签名 ..."
+        codesign --remove-signature "$binary"
+        codesign --force --sign - "$binary"
+    fi
+
     log_info "编译完成: $binary ($(du -h "$binary" | cut -f1))"
 }
 
