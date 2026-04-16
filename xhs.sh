@@ -12,6 +12,7 @@ set -euo pipefail
 #   ./xhs.sh upload    <version> [--target <target>]   上传 OSS
 #   ./xhs.sh upload    <version> --all                 上传所有平台
 #   ./xhs.sh full      <version> [--all]               编译 + 打包 + 上传
+#   ./xhs.sh upload_scripts                             上传安装脚本和模型目录
 #
 # 支持平台:
 #   aarch64-apple-darwin    (macOS ARM64)
@@ -197,6 +198,14 @@ compress_one() {
 
     cp "$binary" "${tmpdir}/${bin_name}"
     chmod +x "${tmpdir}/${bin_name}"
+
+    # 重命名后 linker-signed 签名失效，需要先移除再重签，否则 macOS 会 SIGKILL (Code Signature Invalid)
+    if [[ "$target" == *"-apple-darwin"* ]] && command -v codesign &>/dev/null; then
+        log_info "重新签名 ${bin_name} (ad-hoc) ..."
+        codesign --remove-signature "${tmpdir}/${bin_name}"
+        codesign --force --sign - "${tmpdir}/${bin_name}"
+    fi
+
     cp "$SCRIPT_DIR/config.toml.example" "${tmpdir}/config.toml"
 
     tar -czvf "/tmp/${archive}" -C "$tmpdir" "${bin_name}" config.toml
@@ -255,17 +264,52 @@ upload() {
     done
 }
 
+# ─── 上传脚本文件 ────────────────────────────────────────────────────────────
+
+upload_scripts() {
+    local install_script model_catalog oss_install_script oss_model_catalog
+
+    install_script="$SCRIPT_DIR/install-codex-cli.sh"
+    model_catalog="$SCRIPT_DIR/model_catalog.json"
+    oss_install_script="${OSS_PATH}/install-codex-cli.sh"
+    oss_model_catalog="${OSS_PATH}/model_catalog.json"
+
+    if [[ ! -f "$install_script" ]]; then
+        log_error "找不到文件: $install_script"
+        exit 1
+    fi
+    if [[ ! -f "$model_catalog" ]]; then
+        log_error "找不到文件: $model_catalog"
+        exit 1
+    fi
+
+    log_info "上传 install-codex-cli.sh -> OSS ..."
+    ossutil cp "$install_script" "$oss_install_script" --force
+    ossutil set-acl "$oss_install_script" public-read
+
+    log_info "上传 model_catalog.json -> OSS ..."
+    ossutil cp "$model_catalog" "$oss_model_catalog" --force
+    ossutil set-acl "$oss_model_catalog" public-read
+
+    log_info "脚本文件上传完成:"
+    log_info "  安装脚本: ${OSS_CDN_BASE}/install-codex-cli.sh"
+    log_info "  模型目录: ${OSS_CDN_BASE}/model_catalog.json"
+}
+
 # ─── 参数解析 ──────────────────────────────────────────────────────────────
 
 usage() {
     cat <<EOF
-用法: $0 <command> <version> [options]
+用法:
+  $0 <command> <version> [options]
+  $0 upload_scripts
 
 命令:
   compile   编译 codex-cli
   compress  将编译产物打包为 tar.gz
   upload    上传 tar.gz 到阿里云 OSS
   full      执行完整流程 (compile + compress + upload)
+  upload_scripts  上传 install-codex-cli.sh 和 model_catalog.json
 
 选项:
   --all                编译所有支持的平台
@@ -281,6 +325,7 @@ usage() {
   $0 compile 0.1.0                        # 只编译当前平台
   $0 compile 0.1.0 --target x86_64-unknown-linux-gnu  # 编译指定平台
   $0 full 0.1.0 --target aarch64-apple-darwin --target x86_64-apple-darwin
+  $0 upload_scripts
 EOF
     exit 1
 }
@@ -288,13 +333,31 @@ EOF
 # ─── 主入口 ────────────────────────────────────────────────────────────────
 
 main() {
-    if [[ $# -lt 2 ]]; then
+    if [[ $# -lt 1 ]]; then
         usage
     fi
 
     local command="$1"
-    local version="$2"
-    shift 2
+    shift
+
+    if [[ "$command" == "upload_scripts" ]]; then
+        if [[ $# -ne 0 ]]; then
+            log_error "upload_scripts 不接受额外参数"
+            usage
+        fi
+        log_info "命令: ${command}"
+        echo ""
+        upload_scripts
+        log_info '全部完成!'
+        return
+    fi
+
+    if [[ $# -lt 1 ]]; then
+        usage
+    fi
+
+    local version="$1"
+    shift
 
     # 先验证 rustc 可用 (在主 shell 中执行，错误信息不会被吞掉)
     detect_host_target >/dev/null

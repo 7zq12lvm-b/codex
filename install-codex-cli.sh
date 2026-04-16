@@ -14,8 +14,10 @@ set -euo pipefail
 
 CDN_BASE="https://lsh-oss-it-log.oss-cn-shanghai.aliyuncs.com/codex"
 CLI_NAME="codex-cli"
+MODEL_CATALOG_NAME="model_catalog.json"
 DEFAULT_INSTALL_DIR="/usr/local/bin"
 CONFIG_DIR="$HOME/.codex"
+TMPDIR_CLEANUP=""
 
 # ─── 工具函数 ────────────────────────────────────────────────────────────────
 
@@ -125,7 +127,7 @@ check_existing() {
 install() {
     local version="$1"
     local install_dir="$2"
-    local platform os_name archive_name url tmpdir needs_sudo
+    local platform os_name archive_name url needs_sudo
     local bin_name="${CLI_NAME}"
 
     platform="$(get_platform_label)"
@@ -149,8 +151,9 @@ install() {
     log_info "URL: ${url}"
 
     # 创建临时目录 (退出时自动清理)
-    tmpdir="$(mktemp -d)"
-    trap 'rm -rf "$tmpdir"' EXIT
+    TMPDIR_CLEANUP="$(mktemp -d)"
+    local tmpdir="$TMPDIR_CLEANUP"
+    trap 'rm -rf "$TMPDIR_CLEANUP"' EXIT
 
     # 下载
     download "$url" "${tmpdir}/${archive_name}"
@@ -197,16 +200,34 @@ install() {
         chmod +x "${install_dir}/${bin_name}"
     fi
 
-    # 安装默认配置 (不覆盖已有配置)
+    # 安装默认配置 (已有配置则备份为 .bak)
     if [[ -f "${tmpdir}/config.toml" ]]; then
         mkdir -p "$CONFIG_DIR"
-        if [[ -f "${CONFIG_DIR}/config.toml" ]]; then
-            log_warn "配置文件已存在: ${CONFIG_DIR}/config.toml — 跳过 (不覆盖)"
-        else
-            cp "${tmpdir}/config.toml" "${CONFIG_DIR}/config.toml"
-            log_info "默认配置已写入: ${CONFIG_DIR}/config.toml"
+        if [[ -d "$CONFIG_DIR" && -f "${CONFIG_DIR}/config.toml" ]]; then
+            log_warn "检测到已有配置: ${CONFIG_DIR}/config.toml"
+            log_info "备份原配置目录为: ${CONFIG_DIR}.bak"
+            # 备份已有的整个配置目录
+            if [[ -d "${CONFIG_DIR}.bak" ]]; then
+                rm -rf "${CONFIG_DIR}.bak"
+            fi
+            mv "$CONFIG_DIR" "${CONFIG_DIR}.bak"
+            mkdir -p "$CONFIG_DIR"
         fi
+        cp "${tmpdir}/config.toml" "${CONFIG_DIR}/config.toml"
+        log_info "默认配置已写入: ${CONFIG_DIR}/config.toml"
     fi
+
+    # 下载模型目录到用户配置目录
+    mkdir -p "$CONFIG_DIR"
+    if [[ -f "${CONFIG_DIR}/${MODEL_CATALOG_NAME}" ]]; then
+        log_warn "检测到已有模型目录: ${CONFIG_DIR}/${MODEL_CATALOG_NAME}"
+        log_info "备份原文件为: ${CONFIG_DIR}/${MODEL_CATALOG_NAME}.bak"
+        cp "${CONFIG_DIR}/${MODEL_CATALOG_NAME}" "${CONFIG_DIR}/${MODEL_CATALOG_NAME}.bak"
+        log_info "将覆盖下载..."
+    fi
+    log_info "下载 ${MODEL_CATALOG_NAME} 到 ${CONFIG_DIR}/ ..."
+    download "${CDN_BASE}/${MODEL_CATALOG_NAME}" "${CONFIG_DIR}/${MODEL_CATALOG_NAME}"
+    log_info "模型目录已写入: ${CONFIG_DIR}/${MODEL_CATALOG_NAME}"
 
     # 检查 PATH
     if ! echo "$PATH" | tr ':' '\n' | grep -qx "$install_dir"; then
