@@ -61,8 +61,11 @@ use codex_app_server_protocol::AuthMode;
 use codex_login::AuthManager;
 use codex_login::CodexAuth;
 use codex_login::RefreshTokenError;
+use codex_login::SsoConfig;
 use codex_login::UnauthorizedRecovery;
+use codex_login::current_sso_env;
 use codex_login::default_client::build_reqwest_client;
+use codex_login::load_sso_session_for_env;
 use codex_otel::SessionTelemetry;
 use codex_otel::current_span_w3c_trace_context;
 
@@ -660,15 +663,28 @@ impl ModelClient {
     /// This centralizes setup used by both prewarm and normal request paths so they stay in
     /// lockstep when auth/provider resolution changes.
     async fn current_client_setup(&self) -> Result<CurrentClientSetup> {
-        let auth = match self.state.auth_manager.as_ref() {
+        let auth_manager = self.state.auth_manager.as_ref();
+        let auth = match auth_manager {
             Some(manager) => manager.auth().await,
             None => None,
         };
-        let api_provider = self
+        let mut api_provider = self
             .state
             .provider
             .to_api_provider(auth.as_ref().map(CodexAuth::auth_mode))?;
-        let api_auth = auth_provider_from_auth(auth.clone(), &self.state.provider)?;
+        let mut api_auth = auth_provider_from_auth(auth.clone(), &self.state.provider)?;
+
+        let runtime_sso_env = current_sso_env();
+        api_provider.base_url = SsoConfig::for_env(runtime_sso_env).responses_api_base_url;
+        let sso_cookie = auth_manager
+            .and_then(|manager| load_sso_session_for_env(manager.codex_home(), runtime_sso_env).ok())
+            .flatten()
+            .map(|session| session.cookie_header_value());
+        if let Some(cookie) = sso_cookie {
+            api_auth.token = None;
+            api_auth.account_id = None;
+            api_auth.cookie = Some(cookie);
+        }
         Ok(CurrentClientSetup {
             auth,
             api_provider,

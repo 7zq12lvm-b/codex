@@ -178,6 +178,7 @@ struct UsageErrorBody {
 pub struct CoreAuthProvider {
     pub token: Option<String>,
     pub account_id: Option<String>,
+    pub cookie: Option<String>,
 }
 
 impl CoreAuthProvider {
@@ -185,16 +186,35 @@ impl CoreAuthProvider {
         self.token
             .as_ref()
             .is_some_and(|token| http::HeaderValue::from_str(&format!("Bearer {token}")).is_ok())
+            || self
+                .cookie
+                .as_ref()
+                .is_some_and(|cookie| http::HeaderValue::from_str(cookie).is_ok())
     }
 
     pub fn auth_header_name(&self) -> Option<&'static str> {
-        self.auth_header_attached().then_some("authorization")
+        if self
+            .cookie
+            .as_ref()
+            .is_some_and(|cookie| http::HeaderValue::from_str(cookie).is_ok())
+        {
+            return Some("cookie");
+        }
+        if self
+            .token
+            .as_ref()
+            .is_some_and(|token| http::HeaderValue::from_str(&format!("Bearer {token}")).is_ok())
+        {
+            return Some("authorization");
+        }
+        None
     }
 
     pub fn for_test(token: Option<&str>, account_id: Option<&str>) -> Self {
         Self {
             token: token.map(str::to_string),
             account_id: account_id.map(str::to_string),
+            cookie: None,
         }
     }
 }
@@ -202,6 +222,10 @@ impl CoreAuthProvider {
 impl ApiAuthProvider for CoreAuthProvider {
     fn bearer_token(&self) -> Option<String> {
         self.token.clone()
+    }
+
+    fn cookie_header(&self) -> Option<String> {
+        self.cookie.clone()
     }
 
     fn account_id(&self) -> Option<String> {

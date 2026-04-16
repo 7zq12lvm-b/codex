@@ -19,6 +19,7 @@ use codex_exec::Command as ExecCommand;
 use codex_exec::ReviewArgs;
 use codex_execpolicy::ExecPolicyCheckCommand;
 use codex_login::SsoEnv;
+use codex_login::set_current_sso_env;
 use codex_responses_api_proxy::Args as ResponsesApiProxyArgs;
 use codex_state::StateRuntime;
 use codex_state::state_db_path;
@@ -71,6 +72,10 @@ use codex_terminal_detection::TerminalName;
     override_usage = "codex [OPTIONS] [PROMPT]\n       codex [OPTIONS] <COMMAND> [ARGS]"
 )]
 struct MultitoolCli {
+    /// Runtime SSO environment: prod (default) or sit.
+    #[arg(long = "env", global = true, value_name = "ENV", default_value = "prod")]
+    sso_env: String,
+
     #[clap(flatten)]
     pub config_overrides: CliConfigOverrides,
 
@@ -300,10 +305,6 @@ enum ExecpolicySubcommand {
 struct LoginCommand {
     #[clap(skip)]
     config_overrides: CliConfigOverrides,
-
-    /// SSO environment: prod (default) or sit
-    #[arg(long = "env", value_name = "ENV", default_value = "prod")]
-    sso_env: String,
 
     #[command(subcommand)]
     action: Option<LoginSubcommand>,
@@ -611,12 +612,15 @@ fn main() -> anyhow::Result<()> {
 
 async fn cli_main(arg0_paths: Arg0DispatchPaths) -> anyhow::Result<()> {
     let MultitoolCli {
+        sso_env,
         config_overrides: mut root_config_overrides,
         feature_toggles,
         remote,
         mut interactive,
         subcommand,
     } = MultitoolCli::parse();
+    let selected_sso_env = SsoEnv::from_str_loose(&sso_env);
+    set_current_sso_env(selected_sso_env);
 
     // Fold --enable/--disable into config overrides so they flow to all subcommands.
     let toggle_overrides = feature_toggles.to_overrides()?;
@@ -822,8 +826,7 @@ async fn cli_main(arg0_paths: Arg0DispatchPaths) -> anyhow::Result<()> {
                     run_login_status(login_cli.config_overrides).await;
                 }
                 None => {
-                    let env = SsoEnv::from_str_loose(&login_cli.sso_env);
-                    run_sso_login(login_cli.config_overrides, env).await;
+                    run_sso_login(login_cli.config_overrides, selected_sso_env).await;
                 }
             }
         }

@@ -4,6 +4,8 @@
 //! endpoint, cookie name, and the public key used by backend gateways.
 
 use std::fmt;
+use std::sync::LazyLock;
+use std::sync::RwLock;
 
 /// SSO environment selector.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,6 +41,8 @@ pub struct SsoConfig {
     pub login_url: String,
     /// Internal ticket validation endpoint.
     pub validate_url: String,
+    /// Internal Responses API base URL selected for this SSO environment.
+    pub responses_api_base_url: String,
     /// Cookie name set by the SSO gateway on successful login.
     pub cookie_name: String,
     /// ECDSA public key (base64-encoded, SubjectPublicKeyInfo / DER) used by
@@ -49,6 +53,9 @@ pub struct SsoConfig {
 }
 
 const SUBSYSTEM_ALIAS: &str = "codex";
+const CODEX_SSO_ENV_VAR: &str = "CODEX_SSO_ENV";
+static CURRENT_SSO_ENV_OVERRIDE: LazyLock<RwLock<Option<SsoEnv>>> =
+    LazyLock::new(|| RwLock::new(None));
 
 impl SsoConfig {
     pub fn for_env(env: SsoEnv) -> Self {
@@ -57,6 +64,8 @@ impl SsoConfig {
                 env,
                 login_url: "https://login2.sit.xiaohongshu.com/login".to_string(),
                 validate_url: "https://login2.sit.xiaohongshu.com/sso/internal_login".to_string(),
+                responses_api_base_url: "https://runway.devops.sit.xiaohongshu.com/openai/v2"
+                    .to_string(),
                 cookie_name: "common-internal-access-token-sit".to_string(),
                 pub_key: "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE2iunWc0QXngFE/EWdN+CwZHDSScBWTjqnESruXGnZC+lpQYX7XZiObrPBz46bdRlAPhMCcXN3qIcFAXMslAPLQ==".to_string(),
                 subsystem_alias: SUBSYSTEM_ALIAS.to_string(),
@@ -65,10 +74,37 @@ impl SsoConfig {
                 env,
                 login_url: "https://login2.xiaohongshu.com/login".to_string(),
                 validate_url: "https://login2.xiaohongshu.com/sso/internal_login".to_string(),
+                responses_api_base_url: "https://runway.devops.xiaohongshu.com/openai/v2"
+                    .to_string(),
                 cookie_name: "common-internal-access-token".to_string(),
                 pub_key: "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE2iunWc0QXngFE/EWdN+CwZHDSScBWTjqnESruXGnZC+lpQYX7XZiObrPBz46bdRlAPhMCcXN3qIcFAXMslAPLQ==".to_string(),
                 subsystem_alias: SUBSYSTEM_ALIAS.to_string(),
             },
         }
     }
+}
+
+/// Sets the process-wide SSO environment used by runtime auth/session resolution.
+pub fn set_current_sso_env(env: SsoEnv) {
+    if let Ok(mut guard) = CURRENT_SSO_ENV_OVERRIDE.write() {
+        *guard = Some(env);
+    }
+}
+
+/// Returns the active runtime SSO environment.
+///
+/// Resolution order:
+/// 1. Process override set via [`set_current_sso_env`]
+/// 2. `CODEX_SSO_ENV` environment variable
+/// 3. `prod` default
+pub fn current_sso_env() -> SsoEnv {
+    if let Ok(guard) = CURRENT_SSO_ENV_OVERRIDE.read()
+        && let Some(env) = *guard
+    {
+        return env;
+    }
+
+    std::env::var(CODEX_SSO_ENV_VAR)
+        .map(|value| SsoEnv::from_str_loose(&value))
+        .unwrap_or(SsoEnv::Prod)
 }

@@ -24,6 +24,7 @@ use tracing::info;
 
 use crate::sso_config::SsoConfig;
 use crate::sso_config::SsoEnv;
+use crate::sso_config::current_sso_env;
 
 // ---------------------------------------------------------------------------
 // Persisted session
@@ -80,6 +81,18 @@ fn sso_session_path_for_env(codex_home: &Path, env: SsoEnv) -> PathBuf {
     codex_home.join(format!("sso_session_{env}.json"))
 }
 
+pub fn load_sso_session_for_env(codex_home: &Path, env: SsoEnv) -> io::Result<Option<SsoSession>> {
+    let path = sso_session_path_for_env(codex_home, env);
+    match std::fs::read_to_string(&path) {
+        Ok(contents) => {
+            let session: SsoSession = serde_json::from_str(&contents).map_err(io::Error::other)?;
+            Ok(Some(session))
+        }
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
 pub fn save_sso_session(codex_home: &Path, session: &SsoSession) -> io::Result<()> {
     let env = SsoEnv::from_str_loose(&session.env);
     let path = sso_session_path_for_env(codex_home, env);
@@ -102,26 +115,7 @@ pub fn save_sso_session(codex_home: &Path, session: &SsoSession) -> io::Result<(
 }
 
 pub fn load_sso_session(codex_home: &Path) -> io::Result<Option<SsoSession>> {
-    let path = sso_session_path_for_env(codex_home, SsoEnv::Prod);
-    match std::fs::read_to_string(&path) {
-        Ok(contents) => {
-            let session: SsoSession = serde_json::from_str(&contents).map_err(io::Error::other)?;
-            Ok(Some(session))
-        }
-        Err(e) if e.kind() == io::ErrorKind::NotFound => {
-            let sit_path = sso_session_path_for_env(codex_home, SsoEnv::Sit);
-            match std::fs::read_to_string(&sit_path) {
-                Ok(contents) => {
-                    let session: SsoSession =
-                        serde_json::from_str(&contents).map_err(io::Error::other)?;
-                    Ok(Some(session))
-                }
-                Err(sit_error) if sit_error.kind() == io::ErrorKind::NotFound => Ok(None),
-                Err(sit_error) => Err(sit_error),
-            }
-        }
-        Err(e) => Err(e),
-    }
+    load_sso_session_for_env(codex_home, current_sso_env())
 }
 
 pub fn delete_sso_session(codex_home: &Path) -> io::Result<bool> {

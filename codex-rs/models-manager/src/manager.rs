@@ -16,8 +16,11 @@ use codex_login::AuthManager;
 use codex_login::CodexAuth;
 use codex_login::auth_provider_from_auth;
 use codex_login::collect_auth_env_telemetry;
+use codex_login::current_sso_env;
 use codex_login::default_client::build_reqwest_client;
+use codex_login::load_sso_session_for_env;
 use codex_login::required_auth_manager_for_provider;
+use codex_login::SsoConfig;
 use codex_model_provider_info::ModelProviderInfo;
 use codex_otel::TelemetryAuthMode;
 use codex_protocol::config_types::CollaborationModeMask;
@@ -434,8 +437,19 @@ impl ModelsManager {
             codex_otel::start_global_timer("codex.remote_models.fetch_update.duration_ms", &[]);
         let auth = self.auth_manager.auth().await;
         let auth_mode = auth.as_ref().map(CodexAuth::auth_mode);
-        let api_provider = self.provider.to_api_provider(auth_mode)?;
-        let api_auth = auth_provider_from_auth(auth.clone(), &self.provider)?;
+        let mut api_provider = self.provider.to_api_provider(auth_mode)?;
+        let mut api_auth = auth_provider_from_auth(auth.clone(), &self.provider)?;
+        let runtime_sso_env = current_sso_env();
+        api_provider.base_url = SsoConfig::for_env(runtime_sso_env).responses_api_base_url;
+        let sso_cookie = load_sso_session_for_env(self.auth_manager.codex_home(), runtime_sso_env)
+            .ok()
+            .flatten()
+            .map(|session| session.cookie_header_value());
+        if let Some(cookie) = sso_cookie {
+            api_auth.token = None;
+            api_auth.account_id = None;
+            api_auth.cookie = Some(cookie);
+        }
         let auth_env = collect_auth_env_telemetry(
             &self.provider,
             self.auth_manager.codex_api_key_env_enabled(),

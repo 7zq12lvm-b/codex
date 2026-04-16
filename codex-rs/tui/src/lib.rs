@@ -42,7 +42,7 @@ use codex_exec_server::EnvironmentManager;
 use codex_exec_server::ExecServerRuntimePaths;
 use codex_login::AuthConfig;
 use codex_login::SsoConfig;
-use codex_login::SsoEnv;
+use codex_login::current_sso_env;
 use codex_login::default_client::set_default_client_residency_requirement;
 use codex_login::enforce_login_restrictions;
 use codex_login::load_sso_session;
@@ -878,7 +878,7 @@ pub async fn run_main(
             Ok(Some(_)) => {}
             Ok(None) => {
                 eprintln!("No SSO session found. Starting SSO login...");
-                let sso_config = SsoConfig::for_env(SsoEnv::Prod);
+                let sso_config = SsoConfig::for_env(current_sso_env());
                 match start_sso_login(sso_config, config.codex_home.to_path_buf()) {
                     Ok(server) => {
                         eprintln!(

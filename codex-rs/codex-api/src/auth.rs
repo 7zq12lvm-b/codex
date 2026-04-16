@@ -9,6 +9,9 @@ use http::HeaderValue;
 /// reach this interface.
 pub trait AuthProvider: Send + Sync {
     fn bearer_token(&self) -> Option<String>;
+    fn cookie_header(&self) -> Option<String> {
+        None
+    }
     fn account_id(&self) -> Option<String> {
         None
     }
@@ -24,6 +27,11 @@ pub(crate) fn add_auth_headers_to_header_map<A: AuthProvider>(auth: &A, headers:
         && let Ok(header) = HeaderValue::from_str(&account_id)
     {
         let _ = headers.insert("ChatGPT-Account-ID", header);
+    }
+    if let Some(cookie) = auth.cookie_header()
+        && let Ok(header) = HeaderValue::from_str(&cookie)
+    {
+        let _ = headers.insert(http::header::COOKIE, header);
     }
 }
 
