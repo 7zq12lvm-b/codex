@@ -46,6 +46,9 @@ CARGO_BIN_NAME="codex"
 OSS_PATH="oss://lsh-oss-it-log/codex"
 OSS_CDN_BASE="https://lsh-oss-it-log.oss-cn-shanghai.aliyuncs.com/codex"
 
+VERSION_PATCH_ACTIVE=false
+VERSION_PATCH_BAK=""
+
 # 所有支持的编译目标
 ALL_TARGETS=(
     "aarch64-apple-darwin"
@@ -58,6 +61,72 @@ ALL_TARGETS=(
 log_info()  { echo -e "\033[32m[INFO]\033[0m  $*"; }
 log_warn()  { echo -e "\033[33m[WARN]\033[0m  $*"; }
 log_error() { echo -e "\033[31m[ERROR]\033[0m $*"; }
+
+patch_workspace_version_for_full() {
+    local version="$1"
+    local cargo_toml tmp
+    cargo_toml="$SCRIPT_DIR/codex-rs/Cargo.toml"
+
+    if [[ ! -f "$cargo_toml" ]]; then
+        log_error "找不到 Cargo.toml: $cargo_toml"
+        exit 1
+    fi
+
+    VERSION_PATCH_BAK="$(mktemp)"
+    cp "$cargo_toml" "$VERSION_PATCH_BAK"
+
+    tmp="$(mktemp)"
+    if ! awk -v new_version="$version" '
+        BEGIN { in_workspace_package = 0; patched = 0 }
+        {
+            if ($0 ~ /^\[workspace\.package\]$/) {
+                in_workspace_package = 1
+                print
+                next
+            }
+            if ($0 ~ /^\[/ && $0 !~ /^\[workspace\.package\]$/) {
+                in_workspace_package = 0
+            }
+            if (in_workspace_package && $0 ~ /^version[[:space:]]*=[[:space:]]*"[^"]*"[[:space:]]*$/ && !patched) {
+                print "version = \"" new_version "\""
+                patched = 1
+                next
+            }
+            print
+        }
+        END {
+            if (!patched) {
+                exit 42
+            }
+        }
+    ' "$cargo_toml" > "$tmp"; then
+        rm -f "$tmp"
+        log_error "临时写入 workspace 版本失败，未找到 [workspace.package] 下的 version 字段"
+        exit 1
+    fi
+
+    mv "$tmp" "$cargo_toml"
+    VERSION_PATCH_ACTIVE=true
+    log_info "已临时写入 codex-rs 版本: ${version}"
+}
+
+restore_workspace_version_after_full() {
+    local cargo_toml
+    cargo_toml="$SCRIPT_DIR/codex-rs/Cargo.toml"
+
+    if [[ "$VERSION_PATCH_ACTIVE" != true ]]; then
+        return
+    fi
+
+    if [[ -n "$VERSION_PATCH_BAK" && -f "$VERSION_PATCH_BAK" ]]; then
+        cp "$VERSION_PATCH_BAK" "$cargo_toml"
+        rm -f "$VERSION_PATCH_BAK"
+    fi
+
+    VERSION_PATCH_ACTIVE=false
+    VERSION_PATCH_BAK=""
+    log_info "已恢复 codex-rs/Cargo.toml 原始版本配置"
+}
 
 # 检测当前机器的 Rust target triple
 detect_host_target() {
@@ -159,11 +228,12 @@ compile_one() {
         exit 1
     fi
     # 编译产物自带 linker-signed 签名，直接复制/重命名后会被 macOS SIGKILL
-    # 在编译阶段就替换为 ad-hoc 签名，确保后续无论怎么分发都能运行
+    # 在编译阶段就替换为 ad-hoc + hardened runtime 签名
+    # --options runtime: macOS 26+ Taskgated 要求 root-owned 二进制必须有 hardened runtime
     if [[ "$target" == *"-apple-darwin"* ]] && command -v codesign &>/dev/null; then
         log_info "替换 linker-signed 为 ad-hoc 签名 ..."
         codesign --remove-signature "$binary"
-        codesign --force --sign - "$binary"
+        codesign --force --sign - --options runtime "$binary"
     fi
 
     log_info "编译完成: $binary ($(du -h "$binary" | cut -f1))"
@@ -208,10 +278,11 @@ compress_one() {
     chmod +x "${tmpdir}/${bin_name}"
 
     # 重命名后 linker-signed 签名失效，需要先移除再重签，否则 macOS 会 SIGKILL (Code Signature Invalid)
+    # --options runtime: macOS 26+ Taskgated 要求 root-owned 二进制必须有 hardened runtime
     if [[ "$target" == *"-apple-darwin"* ]] && command -v codesign &>/dev/null; then
         log_info "重新签名 ${bin_name} (ad-hoc) ..."
         codesign --remove-signature "${tmpdir}/${bin_name}"
-        codesign --force --sign - "${tmpdir}/${bin_name}"
+        codesign --force --sign - --options runtime "${tmpdir}/${bin_name}"
     fi
 
     cp "$SCRIPT_DIR/config.toml.example" "${tmpdir}/config.toml"
@@ -410,6 +481,11 @@ main() {
     log_info "目标平台: ${targets[*]}"
     echo ""
 
+    if [[ "$command" == "full" ]]; then
+        patch_workspace_version_for_full "$version"
+        trap restore_workspace_version_after_full EXIT
+    fi
+
     case "$command" in
         compile)
             compile "$version" "${targets[@]}"
@@ -429,6 +505,11 @@ main() {
             usage
             ;;
     esac
+
+    if [[ "$command" == "full" ]]; then
+        restore_workspace_version_after_full
+        trap - EXIT
+    fi
 
     log_info '全部完成!'
 }

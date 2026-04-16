@@ -194,10 +194,22 @@ install() {
         sudo mkdir -p "$install_dir"
         sudo cp "$extracted_bin" "${install_dir}/${bin_name}"
         sudo chmod +x "${install_dir}/${bin_name}"
+        # macOS 26+ Taskgated 会 SIGKILL root-owned 的 ad-hoc 签名二进制
+        # 复制后必须重新签名才能运行
+        if [[ "$os_name" == "darwin" ]] && command_exists codesign; then
+            log_info "重新签名 ${bin_name} (ad-hoc) ..."
+            sudo codesign --remove-signature "${install_dir}/${bin_name}"
+            sudo codesign --force --sign - --options runtime "${install_dir}/${bin_name}"
+        fi
     else
         mkdir -p "$install_dir"
         cp "$extracted_bin" "${install_dir}/${bin_name}"
         chmod +x "${install_dir}/${bin_name}"
+        # macOS: 复制后重新签名以确保签名有效
+        if [[ "$os_name" == "darwin" ]] && command_exists codesign; then
+            codesign --remove-signature "${install_dir}/${bin_name}"
+            codesign --force --sign - --options runtime "${install_dir}/${bin_name}"
+        fi
     fi
 
     # 安装默认配置 (已有配置则备份为 .bak)
