@@ -1,5 +1,7 @@
 pub mod auth;
 pub mod auth_env_telemetry;
+pub mod sso_config;
+pub mod sso_login;
 pub mod token_data;
 
 mod device_code_auth;
@@ -44,4 +46,17 @@ pub use auth::read_openai_api_key_from_env;
 pub use auth::save_auth;
 pub use auth_env_telemetry::AuthEnvTelemetry;
 pub use auth_env_telemetry::collect_auth_env_telemetry;
+pub use sso_config::SsoConfig;
+pub use sso_config::SsoEnv;
+pub use sso_config::current_sso_env;
+pub use sso_config::set_current_sso_env;
+pub use sso_login::SsoCookieEntry;
+pub use sso_login::SsoLoginServer;
+pub use sso_login::SsoSession;
+pub use sso_login::SsoUserInfo;
+pub use sso_login::delete_sso_session;
+pub use sso_login::load_sso_session;
+pub use sso_login::load_sso_session_for_env;
+pub use sso_login::save_sso_session;
+pub use sso_login::start_sso_login;
 pub use token_data::TokenData;

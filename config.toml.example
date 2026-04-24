@@ -1,0 +1,57 @@
+model_provider = "RedNote"
+model = "gpt-5.3-codex"
+model_reasoning_effort = "medium"
+model_catalog_json = "~/.Codex/model_catalog.json"
+check_for_update_on_startup = false
+disable_response_storage = true
+
+[model_providers.RedNote]
+name = "RedNote"
+wire_api = "responses"
+requires_openai_auth = false
+model_reasoning_effort = "high"
+
+# 沙箱详细配置
+[sandbox_workspace_write]
+# 允许网络访问（谨慎启用）
+network_access = false
+# 不排除 TMPDIR 和 /tmp（保持默认行为）
+exclude_tmpdir_env_var = false
+exclude_slash_tmp = false
+
+# 历史记录设置：保存所有对话历史
+[history]
+persistence = "save-all"
+
+# TUI 设置：启用桌面通知
+[tui]
+notifications = true
+
+# 文件链接打开器：使用 VS Code（默认）
+file_opener = "vscode"
+
+# Shell 环境策略：只传递核心环境变量，增加安全性
+[shell_environment_policy]
+inherit = "core"
+ignore_default_excludes = false
+exclude = []
+set = {}
+include_only = []
+
+# 隐藏代理推理过程（使输出更简洁）
+hide_agent_reasoning = false
+
+# 不显示原始代理推理内容（保护敏感信息）
+show_raw_agent_reasoning = false
+
+# 如果您需要使用 MCP 服务器，请按照以下格式添加
+# [mcp_servers.example]
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/server-example"]
+# env = { "EXAMPLE_API_KEY" = "your_key_here" }
+
+# 项目信任级别设置示例（如果需要将特定项目标记为受信任）
+# [projects."/path/to/trusted/project"]
+# trust_level = "trusted"
+
+

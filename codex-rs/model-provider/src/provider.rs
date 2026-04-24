@@ -15,8 +15,10 @@ use codex_protocol::account::ProviderAccount;
 use codex_protocol::openai_models::ModelsResponse;
 
 use crate::amazon_bedrock::AmazonBedrockModelProvider;
+use crate::auth::apply_sso_provider_override;
 use crate::auth::auth_manager_for_provider;
 use crate::auth::resolve_provider_auth;
+use crate::auth::sso_auth_provider;
 use crate::models_endpoint::OpenAiModelsEndpoint;
 
 /// Current app-visible account state for a model provider.
@@ -76,12 +78,24 @@ pub trait ModelProvider: fmt::Debug + Send + Sync {
     /// Returns provider configuration adapted for the API client.
     async fn api_provider(&self) -> codex_protocol::error::Result<Provider> {
         let auth = self.auth().await;
-        self.info()
-            .to_api_provider(auth.as_ref().map(CodexAuth::auth_mode))
+        let mut api_provider = self
+            .info()
+            .to_api_provider(auth.as_ref().map(CodexAuth::auth_mode))?;
+        apply_sso_provider_override(
+            self.info(),
+            self.auth_manager().as_deref(),
+            &mut api_provider,
+        );
+        Ok(api_provider)
     }
 
     /// Returns the auth provider used to attach request credentials.
     async fn api_auth(&self) -> codex_protocol::error::Result<SharedAuthProvider> {
+        if self.info().requires_openai_auth
+            && let Some(sso_auth) = sso_auth_provider(self.auth_manager().as_deref())
+        {
+            return Ok(sso_auth);
+        }
         let auth = self.auth().await;
         resolve_provider_auth(auth.as_ref(), self.info())
     }

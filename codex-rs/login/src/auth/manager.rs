@@ -1700,6 +1700,10 @@ impl AuthManager {
         Ok(result)
     }
 
+    pub fn codex_home(&self) -> &Path {
+        &self.codex_home
+    }
+
     pub fn get_api_auth_mode(&self) -> Option<ApiAuthMode> {
         if self.has_external_api_key_auth() {
             return Some(ApiAuthMode::ApiKey);

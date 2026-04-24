@@ -40,8 +40,14 @@ use codex_exec_server::EnvironmentManager;
 use codex_exec_server::EnvironmentManagerArgs;
 use codex_exec_server::ExecServerRuntimePaths;
 use codex_login::AuthConfig;
+use codex_login::CODEX_API_KEY_ENV_VAR;
+use codex_login::OPENAI_API_KEY_ENV_VAR;
+use codex_login::SsoConfig;
+use codex_login::current_sso_env;
 use codex_login::default_client::set_default_client_residency_requirement;
 use codex_login::enforce_login_restrictions;
+use codex_login::load_sso_session;
+use codex_login::start_sso_login;
 use codex_protocol::ThreadId;
 use codex_protocol::config_types::AltScreenMode;
 use codex_protocol::config_types::SandboxMode;
@@ -873,6 +879,51 @@ pub async fn run_main(
         {
             eprintln!("Error adding directories: {warning}");
             std::process::exit(1);
+        }
+    }
+
+    // If no valid SSO session exists, automatically start the SSO login flow.
+    let has_env_api_key = std::env::var_os(OPENAI_API_KEY_ENV_VAR).is_some()
+        || std::env::var_os(CODEX_API_KEY_ENV_VAR).is_some();
+
+    #[allow(clippy::print_stderr)]
+    if matches!(app_server_target, AppServerTarget::Embedded) && !has_env_api_key {
+        match load_sso_session(&config.codex_home) {
+            Ok(Some(_)) => {}
+            Ok(None) => {
+                eprintln!("No SSO session found. Starting SSO login...");
+                let sso_config = SsoConfig::for_env(current_sso_env());
+                match start_sso_login(sso_config, config.codex_home.to_path_buf()) {
+                    Ok(server) => {
+                        eprintln!(
+                            "Starting local SSO callback server on http://localhost:{}.\n\
+                             If your browser did not open, navigate to this URL to authenticate:\n\n\
+                             {}\n",
+                            server.actual_port, server.login_url
+                        );
+                        match server.wait_for_login().await {
+                            Ok(session) => {
+                                eprintln!(
+                                    "Successfully logged in via SSO as {} ({})",
+                                    session.user.display_name, session.user.email
+                                );
+                            }
+                            Err(e) => {
+                                eprintln!("SSO login failed: {e}");
+                                std::process::exit(1);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to start SSO login server: {e}");
+                        std::process::exit(1);
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("Error checking SSO session: {e}");
+                std::process::exit(1);
+            }
         }
     }
 

@@ -4,14 +4,19 @@ use codex_agent_identity::AgentIdentityKey;
 use codex_agent_identity::AgentTaskAuthorizationTarget;
 use codex_agent_identity::authorization_header_for_agent_task;
 use codex_api::AuthProvider;
+use codex_api::Provider;
 use codex_api::SharedAuthProvider;
 use codex_login::AuthManager;
 use codex_login::CodexAuth;
+use codex_login::SsoConfig;
+use codex_login::current_sso_env;
+use codex_login::load_sso_session_for_env;
 use codex_model_provider_info::ModelProviderInfo;
 use http::HeaderMap;
 use http::HeaderValue;
 
 use crate::bearer_auth_provider::BearerAuthProvider;
+use crate::cookie_auth_provider::CookieAuthProvider;
 
 #[derive(Clone, Debug)]
 struct AgentIdentityAuthProvider {
@@ -66,6 +71,30 @@ impl AuthProvider for UnauthenticatedAuthProvider {
 
 pub fn unauthenticated_auth_provider() -> SharedAuthProvider {
     Arc::new(UnauthenticatedAuthProvider)
+}
+
+fn sso_cookie(auth_manager: Option<&AuthManager>) -> Option<String> {
+    let auth_manager = auth_manager?;
+    let runtime_sso_env = current_sso_env();
+    load_sso_session_for_env(auth_manager.codex_home(), runtime_sso_env)
+        .ok()
+        .flatten()
+        .map(|session| session.cookie_header_value())
+}
+
+pub fn sso_auth_provider(auth_manager: Option<&AuthManager>) -> Option<SharedAuthProvider> {
+    sso_cookie(auth_manager)
+        .map(|cookie| Arc::new(CookieAuthProvider::new(cookie)) as SharedAuthProvider)
+}
+
+pub(crate) fn apply_sso_provider_override(
+    provider: &ModelProviderInfo,
+    auth_manager: Option<&AuthManager>,
+    api_provider: &mut Provider,
+) {
+    if provider.requires_openai_auth && sso_cookie(auth_manager).is_some() {
+        api_provider.base_url = SsoConfig::for_env(current_sso_env()).responses_api_base_url;
+    }
 }
 
 /// Returns the provider-scoped auth manager when this provider uses command-backed auth.

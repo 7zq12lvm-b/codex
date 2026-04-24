@@ -629,6 +629,7 @@ impl App {
             status_line_invalid_items_warned: self.status_line_invalid_items_warned.clone(),
             terminal_title_invalid_items_warned: self.terminal_title_invalid_items_warned.clone(),
             session_telemetry: self.session_telemetry.clone(),
+            sso_user_name: self.chat_widget.sso_user_name.clone(),
         }
     }
 
@@ -732,6 +733,10 @@ impl App {
         let has_chatgpt_account = bootstrap.has_chatgpt_account;
         let requires_openai_auth = bootstrap.requires_openai_auth;
         let status_account_display = bootstrap.status_account_display.clone();
+        let sso_user_name = codex_login::load_sso_session(&config.codex_home)
+            .ok()
+            .flatten()
+            .map(|s| s.user.display_name);
         let initial_plan_type = bootstrap.plan_type;
         let session_telemetry = SessionTelemetry::new(
             ThreadId::new(),
@@ -788,6 +793,7 @@ impl App {
                     terminal_title_invalid_items_warned: terminal_title_invalid_items_warned
                         .clone(),
                     session_telemetry: session_telemetry.clone(),
+                    sso_user_name: sso_user_name.clone(),
                 };
                 (ChatWidget::new_with_app_event(init), Some(started))
             }
@@ -822,6 +828,7 @@ impl App {
                     terminal_title_invalid_items_warned: terminal_title_invalid_items_warned
                         .clone(),
                     session_telemetry: session_telemetry.clone(),
+                    sso_user_name: sso_user_name.clone(),
                 };
                 (ChatWidget::new_with_app_event(init), Some(resumed))
             }
@@ -861,6 +868,7 @@ impl App {
                     terminal_title_invalid_items_warned: terminal_title_invalid_items_warned
                         .clone(),
                     session_telemetry: session_telemetry.clone(),
+                    sso_user_name: sso_user_name.clone(),
                 };
                 (ChatWidget::new_with_app_event(init), Some(forked))
             }

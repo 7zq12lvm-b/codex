@@ -407,6 +407,7 @@ async fn enqueue_primary_thread_session_replays_turns_before_initial_prompt_subm
         status_line_invalid_items_warned: app.status_line_invalid_items_warned.clone(),
         terminal_title_invalid_items_warned: app.terminal_title_invalid_items_warned.clone(),
         session_telemetry: app.session_telemetry.clone(),
+        sso_user_name: None,
     });
 
     app.enqueue_primary_thread_session(
@@ -4442,6 +4443,7 @@ async fn replace_chat_widget_reseeds_collab_agent_metadata_for_replay() {
         status_line_invalid_items_warned: app.status_line_invalid_items_warned.clone(),
         terminal_title_invalid_items_warned: app.terminal_title_invalid_items_warned.clone(),
         session_telemetry: app.session_telemetry.clone(),
+        sso_user_name: None,
     });
     app.replace_chat_widget(replacement);
 

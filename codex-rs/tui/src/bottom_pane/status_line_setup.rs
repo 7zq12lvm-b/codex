@@ -114,6 +114,9 @@ pub(crate) enum StatusLineItem {
 
     /// Latest checklist task progress from `update_plan` (if available).
     TaskProgress,
+
+    /// SSO user display name (omitted when not logged in).
+    SsoUser,
 }
 
 impl StatusLineItem {
@@ -149,10 +152,11 @@ impl StatusLineItem {
                 "Current session identifier (omitted until session starts)"
             }
             StatusLineItem::FastMode => "Whether Fast mode is currently active",
-            StatusLineItem::ThreadTitle => "Current thread title (omitted when unavailable)",
+            StatusLineItem::ThreadTitle => "Current thread title (omitted unless changed by user)",
             StatusLineItem::TaskProgress => {
                 "Latest task progress from update_plan (omitted until available)"
             }
+            StatusLineItem::SsoUser => "SSO user display name (omitted when not logged in)",
         }
     }
 
@@ -177,6 +181,7 @@ impl StatusLineItem {
             StatusLineItem::FastMode => StatusSurfacePreviewItem::FastMode,
             StatusLineItem::ThreadTitle => StatusSurfacePreviewItem::ThreadTitle,
             StatusLineItem::TaskProgress => StatusSurfacePreviewItem::TaskProgress,
+            StatusLineItem::SsoUser => StatusSurfacePreviewItem::SsoUser,
         }
     }
 }

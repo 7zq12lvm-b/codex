@@ -26,7 +26,9 @@ use codex_response_debug_context::telemetry_transport_error_message;
 use http::HeaderMap;
 use tokio::time::timeout;
 
+use crate::auth::apply_sso_provider_override;
 use crate::auth::resolve_provider_auth;
+use crate::auth::sso_auth_provider;
 
 const MODELS_REFRESH_TIMEOUT: Duration = Duration::from_secs(5);
 const MODELS_ENDPOINT: &str = "/models";
@@ -86,8 +88,20 @@ impl ModelsEndpointClient for OpenAiModelsEndpoint {
             codex_otel::start_global_timer("codex.remote_models.fetch_update.duration_ms", &[]);
         let auth = self.auth().await;
         let auth_mode = auth.as_ref().map(CodexAuth::auth_mode);
-        let api_provider = self.provider_info.to_api_provider(auth_mode)?;
-        let api_auth = resolve_provider_auth(auth.as_ref(), &self.provider_info)?;
+        let mut api_provider = self.provider_info.to_api_provider(auth_mode)?;
+        apply_sso_provider_override(
+            &self.provider_info,
+            self.auth_manager.as_deref(),
+            &mut api_provider,
+        );
+        let api_auth = if self.provider_info.requires_openai_auth {
+            match sso_auth_provider(self.auth_manager.as_deref()) {
+                Some(auth) => auth,
+                None => resolve_provider_auth(auth.as_ref(), &self.provider_info)?,
+            }
+        } else {
+            resolve_provider_auth(auth.as_ref(), &self.provider_info)?
+        };
         let transport = ReqwestTransport::new(build_reqwest_client());
         let auth_telemetry = auth_header_telemetry(api_auth.as_ref());
         let request_telemetry: Arc<dyn RequestTelemetry> = Arc::new(ModelsRequestTelemetry {

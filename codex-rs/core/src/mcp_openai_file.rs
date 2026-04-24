@@ -39,9 +39,14 @@ pub(crate) async fn rewrite_mcp_tool_arguments_for_openai_files(
         let Some(value) = arguments.get(field_name) else {
             continue;
         };
-        let Some(uploaded_value) =
-            rewrite_argument_value_for_openai_files(turn_context, auth.as_ref(), field_name, value)
-                .await?
+        let Some(uploaded_value) = rewrite_argument_value_for_openai_files(
+            turn_context,
+            Some(sess.services.auth_manager.as_ref()),
+            auth.as_ref(),
+            field_name,
+            value,
+        )
+        .await?
         else {
             continue;
         };
@@ -57,6 +62,7 @@ pub(crate) async fn rewrite_mcp_tool_arguments_for_openai_files(
 
 async fn rewrite_argument_value_for_openai_files(
     turn_context: &TurnContext,
+    auth_manager: Option<&codex_login::AuthManager>,
     auth: Option<&CodexAuth>,
     field_name: &str,
     value: &JsonValue,
@@ -65,6 +71,7 @@ async fn rewrite_argument_value_for_openai_files(
         JsonValue::String(path_or_file_ref) => {
             let rewritten = build_uploaded_local_argument_value(
                 turn_context,
+                auth_manager,
                 auth,
                 field_name,
                 /*index*/ None,
@@ -81,6 +88,7 @@ async fn rewrite_argument_value_for_openai_files(
                 };
                 let rewritten = build_uploaded_local_argument_value(
                     turn_context,
+                    auth_manager,
                     auth,
                     field_name,
                     Some(index),
@@ -97,23 +105,23 @@ async fn rewrite_argument_value_for_openai_files(
 
 async fn build_uploaded_local_argument_value(
     turn_context: &TurnContext,
+    auth_manager: Option<&codex_login::AuthManager>,
     auth: Option<&CodexAuth>,
     field_name: &str,
     index: Option<usize>,
     file_path: &str,
 ) -> Result<JsonValue, String> {
     let resolved_path = turn_context.resolve_path(Some(file_path.to_string()));
-    let Some(auth) = auth else {
+    let upload_auth = codex_model_provider::sso_auth_provider(auth_manager).or_else(|| {
+        auth.filter(|auth| auth.uses_codex_backend())
+            .map(codex_model_provider::auth_provider_from_auth)
+    });
+    let Some(upload_auth) = upload_auth else {
         return Err(
-            "ChatGPT auth is required to upload local files for Codex Apps tools".to_string(),
+            "ChatGPT auth or SSO session is required to upload local files for Codex Apps tools"
+                .to_string(),
         );
     };
-    if !auth.uses_codex_backend() {
-        return Err(
-            "ChatGPT auth is required to upload local files for Codex Apps tools".to_string(),
-        );
-    }
-    let upload_auth = codex_model_provider::auth_provider_from_auth(auth);
     let uploaded = upload_local_file(
         turn_context.config.chatgpt_base_url.trim_end_matches('/'),
         upload_auth.as_ref(),
@@ -224,6 +232,7 @@ mod tests {
 
         let rewritten = build_uploaded_local_argument_value(
             &turn_context,
+            turn_context.auth_manager.as_deref(),
             Some(&auth),
             "file",
             /*index*/ None,
@@ -304,6 +313,7 @@ mod tests {
         turn_context.config = Arc::new(config);
         let rewritten = rewrite_argument_value_for_openai_files(
             &turn_context,
+            turn_context.auth_manager.as_deref(),
             Some(&auth),
             "file",
             &serde_json::json!("file_report.csv"),
@@ -418,6 +428,7 @@ mod tests {
         turn_context.config = Arc::new(config);
         let rewritten = rewrite_argument_value_for_openai_files(
             &turn_context,
+            turn_context.auth_manager.as_deref(),
             Some(&auth),
             "files",
             &serde_json::json!(["one.csv", "two.csv"]),

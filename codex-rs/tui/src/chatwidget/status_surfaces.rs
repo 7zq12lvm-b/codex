@@ -493,6 +493,7 @@ impl ChatWidget {
                 (!trimmed.is_empty()).then(|| trimmed.to_string())
             }),
             StatusLineItem::TaskProgress => self.terminal_title_task_progress(),
+            StatusLineItem::SsoUser => self.sso_user_name.clone(),
         }
     }
 
@@ -522,6 +523,7 @@ impl ChatWidget {
             StatusSurfacePreviewItem::FastMode => StatusLineItem::FastMode,
             StatusSurfacePreviewItem::Model => StatusLineItem::ModelName,
             StatusSurfacePreviewItem::ModelWithReasoning => StatusLineItem::ModelWithReasoning,
+            StatusSurfacePreviewItem::SsoUser => return self.sso_user_name.clone(),
         };
         self.status_line_value_for_item(&status_line_item)
     }
