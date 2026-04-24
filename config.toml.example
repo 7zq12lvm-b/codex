@@ -4,13 +4,11 @@ model_reasoning_effort = "medium"
 model_catalog_json = "~/.Codex/model_catalog.json"
 check_for_update_on_startup = false
 disable_response_storage = true
-openai_base_url = "https://it-gpt-5-1-codex-eu2.openai.azure.com/openai/v1"
 
 [model_providers.RedNote]
 name = "RedNote"
 wire_api = "responses"
 requires_openai_auth = false
-base_url = "https://it-gpt-5-1-codex-eu2.openai.azure.com/openai/v1"
 model_reasoning_effort = "high"
 
 # 沙箱详细配置
