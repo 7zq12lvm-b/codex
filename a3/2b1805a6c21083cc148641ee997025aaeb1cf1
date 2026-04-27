@@ -1,0 +1,47 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "a32b1805a6c21083cc148641ee997025aaeb1cf1",
+  "prompts": {
+    "203a0042f5c9bab2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_240c7f35effeaIDdpMH4EhpkQF",
+        "model": "github-copilot/claude-opus-4.7"
+      },
+      "human_author": "白明强",
+      "messages": [],
+      "total_additions": 421,
+      "total_deletions": 0,
+      "accepted_lines": 133,
+      "overriden_lines": 0
+    },
+    "820c5da3847afc1c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_240c7f35effeaIDdpMH4EhpkQF-89cfe68c-f510-4f01-8eef-ec907858f2bc",
+        "model": "unknown"
+      },
+      "human_author": "白明强",
+      "messages": [],
+      "total_additions": 146,
+      "total_deletions": 262,
+      "accepted_lines": 22,
+      "overriden_lines": 0
+    },
+    "b8d307dbdba281f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_240c7f35effeaIDdpMH4EhpkQF-a483d694-ebd2-4ca0-b2b3-c2d05734c27c",
+        "model": "unknown"
+      },
+      "human_author": "白明强",
+      "messages": [],
+      "total_additions": 528,
+      "total_deletions": 151,
+      "accepted_lines": 528,
+      "overriden_lines": 0
+    }
+  }
+}
