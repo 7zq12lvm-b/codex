@@ -42,14 +42,11 @@ mod app_cmd;
 mod desktop_app;
 mod marketplace_cmd;
 mod mcp_cmd;
-mod responses_cmd;
 #[cfg(not(windows))]
 mod wsl_paths;
 
 use crate::marketplace_cmd::MarketplaceCli;
 use crate::mcp_cmd::McpCli;
-use crate::responses_cmd::ResponsesCommand;
-use crate::responses_cmd::run_responses_command;
 
 use codex_core::build_models_manager;
 use codex_core::clear_memory_roots_contents;
@@ -170,10 +167,6 @@ enum Subcommand {
     /// Internal: run the responses API proxy.
     #[clap(hide = true)]
     ResponsesApiProxy(ResponsesApiProxyArgs),
-
-    /// Internal: send one raw Responses API payload through Codex auth.
-    #[clap(hide = true)]
-    Responses(ResponsesCommand),
 
     /// Internal: relay stdio to a Unix domain socket.
     #[clap(hide = true, name = "stdio-to-uds")]
@@ -367,7 +360,6 @@ enum ExecpolicySubcommand {
 struct LoginCommand {
     #[clap(skip)]
     config_overrides: CliConfigOverrides,
-
     #[command(subcommand)]
     action: Option<LoginSubcommand>,
 }
@@ -812,7 +804,7 @@ async fn cli_main(arg0_paths: Arg0DispatchPaths) -> anyhow::Result<()> {
                     codex_app_server::run_main_with_transport(
                         arg0_paths.clone(),
                         root_config_overrides,
-                        codex_core::config_loader::LoaderOverrides::default(),
+                        codex_config::LoaderOverrides::default(),
                         analytics_default_enabled,
                         transport,
                         codex_protocol::protocol::SessionSource::VSCode,
@@ -1095,14 +1087,6 @@ async fn cli_main(arg0_paths: Arg0DispatchPaths) -> anyhow::Result<()> {
             )?;
             tokio::task::spawn_blocking(move || codex_responses_api_proxy::run_main(args))
                 .await??;
-        }
-        Some(Subcommand::Responses(ResponsesCommand {})) => {
-            reject_remote_mode_for_subcommand(
-                root_remote.as_deref(),
-                root_remote_auth_token_env.as_deref(),
-                "responses",
-            )?;
-            run_responses_command(root_config_overrides).await?;
         }
         Some(Subcommand::StdioToUds(cmd)) => {
             reject_remote_mode_for_subcommand(
@@ -1515,7 +1499,7 @@ async fn run_interactive_tui(
     codex_tui::run_main(
         interactive,
         arg0_paths,
-        codex_core::config_loader::LoaderOverrides::default(),
+        codex_config::LoaderOverrides::default(),
         normalized_remote,
         remote_auth_token,
     )
@@ -1803,12 +1787,13 @@ mod tests {
     }
 
     #[test]
-    fn responses_subcommand_is_hidden_from_help_but_parses() {
-        let help = MultitoolCli::command().render_help().to_string();
-        assert!(!help.contains("responses"));
-
-        let cli = MultitoolCli::try_parse_from(["codex", "responses"]).expect("parse");
-        assert!(matches!(cli.subcommand, Some(Subcommand::Responses(_))));
+    fn responses_subcommand_is_not_registered() {
+        let command = MultitoolCli::command();
+        assert!(
+            command
+                .get_subcommands()
+                .all(|subcommand| subcommand.get_name() != "responses")
+        );
     }
 
     fn help_from_args(args: &[&str]) -> String {
