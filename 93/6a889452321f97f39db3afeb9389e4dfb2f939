@@ -1,0 +1,40 @@
+config.toml.example
+  203a0042f5c9bab2 4
+Modifications.md
+  203a0042f5c9bab2 1-129
+xhs.sh
+  203a0042f5c9bab2 20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "936a889452321f97f39db3afeb9389e4dfb2f939",
+  "prompts": {
+    "203a0042f5c9bab2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_240c7f35effeaIDdpMH4EhpkQF",
+        "model": "github-copilot/claude-opus-4.7"
+      },
+      "human_author": "白明强",
+      "messages": [],
+      "total_additions": 144,
+      "total_deletions": 7,
+      "accepted_lines": 131,
+      "overriden_lines": 1
+    },
+    "2325c979c71f9fd3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_240c7f35effeaIDdpMH4EhpkQF-b0355bb8-bb24-4532-90df-457b86f82430",
+        "model": "unknown"
+      },
+      "human_author": "白明强",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 7,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
