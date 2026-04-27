@@ -887,7 +887,10 @@ pub async fn run_main(
         || std::env::var_os(CODEX_API_KEY_ENV_VAR).is_some();
 
     #[allow(clippy::print_stderr)]
-    if matches!(app_server_target, AppServerTarget::Embedded) && !has_env_api_key {
+    if matches!(app_server_target, AppServerTarget::Embedded)
+        && config.model_provider.uses_internal_sso_auth()
+        && !has_env_api_key
+    {
         match load_sso_session(&config.codex_home) {
             Ok(Some(_)) => {}
             Ok(None) => {

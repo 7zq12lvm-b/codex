@@ -15,6 +15,9 @@ When syncing with upstream later, treat these changes as **intentional internal 
 
 - Added internal SSO login flow and persisted SSO session handling.
 - Current authentication path is based on **SSO + cookie**, not the old OpenAI-auth-only path.
+- Internal SSO is **not** gated by `requires_openai_auth`. We decoupled the internal SSO trigger from
+  upstream OpenAI login semantics so RedNote / runway-style providers can use SSO + cookie without
+  opening the OpenAI login flow.
 - Cookie auth is isolated into a dedicated provider implementation to reduce merge conflicts with upstream.
 - TUI startup behavior was adjusted so embedded runs can automatically start SSO login when there is no
   valid SSO session and no API-key-based auth in the environment.
@@ -25,6 +28,7 @@ Relevant files include:
 - `codex-rs/login/src/sso_login.rs`
 - `codex-rs/model-provider/src/cookie_auth_provider.rs`
 - `codex-rs/model-provider/src/auth.rs`
+- `codex-rs/model-provider-info/src/lib.rs`
 - `codex-rs/model-provider/src/provider.rs`
 - `codex-rs/model-provider/src/models_endpoint.rs`
 - `codex-rs/tui/src/lib.rs`

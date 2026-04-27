@@ -141,6 +141,14 @@ pub struct ModelProviderAwsAuthInfo {
 }
 
 impl ModelProviderInfo {
+    pub fn uses_internal_sso_auth(&self) -> bool {
+        self.name.eq_ignore_ascii_case("RedNote")
+            || self
+                .base_url
+                .as_ref()
+                .is_some_and(|base_url| base_url.contains("runway.devops"))
+    }
+
     pub fn validate(&self) -> std::result::Result<(), String> {
         if self.aws.is_some() {
             if self.supports_websockets {

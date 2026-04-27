@@ -92,7 +92,7 @@ pub(crate) fn apply_sso_provider_override(
     auth_manager: Option<&AuthManager>,
     api_provider: &mut Provider,
 ) {
-    if provider.requires_openai_auth && sso_cookie(auth_manager).is_some() {
+    if provider.uses_internal_sso_auth() && sso_cookie(auth_manager).is_some() {
         api_provider.base_url = SsoConfig::for_env(current_sso_env()).responses_api_base_url;
     }
 }

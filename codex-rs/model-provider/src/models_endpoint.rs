@@ -94,7 +94,7 @@ impl ModelsEndpointClient for OpenAiModelsEndpoint {
             self.auth_manager.as_deref(),
             &mut api_provider,
         );
-        let api_auth = if self.provider_info.requires_openai_auth {
+        let api_auth = if self.provider_info.uses_internal_sso_auth() {
             match sso_auth_provider(self.auth_manager.as_deref()) {
                 Some(auth) => auth,
                 None => resolve_provider_auth(auth.as_ref(), &self.provider_info)?,

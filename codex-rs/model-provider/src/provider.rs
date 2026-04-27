@@ -91,7 +91,7 @@ pub trait ModelProvider: fmt::Debug + Send + Sync {
 
     /// Returns the auth provider used to attach request credentials.
     async fn api_auth(&self) -> codex_protocol::error::Result<SharedAuthProvider> {
-        if self.info().requires_openai_auth
+        if self.info().uses_internal_sso_auth()
             && let Some(sso_auth) = sso_auth_provider(self.auth_manager().as_deref())
         {
             return Ok(sso_auth);
