@@ -1,0 +1,47 @@
+codex-rs/model-provider/src/models_endpoint.rs
+  203a0042f5c9bab2 97
+codex-rs/tui/src/lib.rs
+  4af7c5f746d84c37 891
+  203a0042f5c9bab2 890,892-893
+codex-rs/model-provider/src/provider.rs
+  203a0042f5c9bab2 94
+codex-rs/model-provider/src/auth.rs
+  203a0042f5c9bab2 95
+Modifications.md
+  203a0042f5c9bab2 18-20,31
+codex-rs/model-provider-info/src/lib.rs
+  203a0042f5c9bab2 144-151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "140f554f7e735da95315f71dffa1e647ce370af9",
+  "prompts": {
+    "203a0042f5c9bab2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_240c7f35effeaIDdpMH4EhpkQF",
+        "model": "github-copilot/claude-opus-4.7"
+      },
+      "human_author": "白明强",
+      "messages": [],
+      "total_additions": 19,
+      "total_deletions": 4,
+      "accepted_lines": 19,
+      "overriden_lines": 0
+    },
+    "4af7c5f746d84c37": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_240c7f35effeaIDdpMH4EhpkQF-65efb74a-f69e-4a01-bec9-b193ff64ef37",
+        "model": "unknown"
+      },
+      "human_author": "白明强",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
