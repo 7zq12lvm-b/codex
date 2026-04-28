@@ -1332,7 +1332,7 @@ async fn run_debug_models_command(
             .map_err(anyhow::Error::msg)?;
         let config = Config::load_with_cli_overrides(cli_overrides).await?;
         let auth_manager =
-            AuthManager::shared_from_config(&config, /*enable_codex_api_key_env*/ true);
+            AuthManager::shared_from_config(&config, /*enable_codex_api_key_env*/ true).await;
         let models_manager =
             build_models_manager(&config, auth_manager, CollaborationModesConfig::default());
         models_manager
@@ -1623,6 +1623,7 @@ mod tests {
             subcommand,
             feature_toggles: _,
             remote: _,
+            sso_env: _,
         } = cli;
 
         let Subcommand::Resume(ResumeCommand {
@@ -1656,6 +1657,7 @@ mod tests {
             subcommand,
             feature_toggles: _,
             remote: _,
+            sso_env: _,
         } = cli;
 
         let Subcommand::Fork(ForkCommand {

@@ -1,6 +1,7 @@
 pub(crate) mod debug_sandbox;
 mod exit_status;
 pub(crate) mod login;
+mod login_sso_internal;
 
 use clap::Parser;
 use codex_utils_absolute_path::AbsolutePathBuf;
@@ -9,9 +10,9 @@ use codex_utils_cli::CliConfigOverrides;
 pub use debug_sandbox::run_command_under_landlock;
 pub use debug_sandbox::run_command_under_seatbelt;
 pub use debug_sandbox::run_command_under_windows;
-pub use login::run_login_status;
-pub use login::run_logout;
-pub use login::run_sso_login;
+pub use login_sso_internal::run_login_status;
+pub use login_sso_internal::run_logout;
+pub use login_sso_internal::run_sso_login;
 
 #[derive(Debug, Parser)]
 pub struct SeatbeltCommand {
