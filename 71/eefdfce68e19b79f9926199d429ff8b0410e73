@@ -1,0 +1,12 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "71eefdfce68e19b79f9926199d429ff8b0410e73",
+  "prompts": {},
+  "humans": {
+    "h_7682562f57a3e3": {
+      "author": "白明强"
+    }
+  }
+}
