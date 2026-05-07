@@ -1,7 +1,6 @@
 mod amazon_bedrock;
 mod auth;
 mod bearer_auth_provider;
-mod cookie_auth_provider;
 mod models_endpoint;
 mod provider;
 
@@ -11,7 +10,6 @@ pub use auth::unauthenticated_auth_provider;
 pub use bearer_auth_provider::BearerAuthProvider;
 pub use bearer_auth_provider::BearerAuthProvider as CoreAuthProvider;
 pub use codex_protocol::account::ProviderAccount;
-pub use cookie_auth_provider::CookieAuthProvider;
 pub use provider::ModelProvider;
 pub use provider::ProviderAccountError;
 pub use provider::ProviderAccountResult;

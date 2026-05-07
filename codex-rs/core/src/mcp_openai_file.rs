@@ -118,7 +118,7 @@ async fn build_uploaded_local_argument_value(
     });
     let Some(upload_auth) = upload_auth else {
         return Err(
-            "ChatGPT auth or SSO session is required to upload local files for Codex Apps tools"
+            "login session or configured API key is required to upload local files for Codex Apps tools"
                 .to_string(),
         );
     };

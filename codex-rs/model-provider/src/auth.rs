@@ -10,13 +10,11 @@ use codex_login::AuthManager;
 use codex_login::CodexAuth;
 use codex_login::SsoConfig;
 use codex_login::current_sso_env;
-use codex_login::load_sso_session_for_env;
 use codex_model_provider_info::ModelProviderInfo;
 use http::HeaderMap;
 use http::HeaderValue;
 
 use crate::bearer_auth_provider::BearerAuthProvider;
-use crate::cookie_auth_provider::CookieAuthProvider;
 
 #[derive(Clone, Debug)]
 struct AgentIdentityAuthProvider {
@@ -73,18 +71,13 @@ pub fn unauthenticated_auth_provider() -> SharedAuthProvider {
     Arc::new(UnauthenticatedAuthProvider)
 }
 
-fn sso_cookie(auth_manager: Option<&AuthManager>) -> Option<String> {
-    let auth_manager = auth_manager?;
-    let runtime_sso_env = current_sso_env();
-    load_sso_session_for_env(auth_manager.codex_home(), runtime_sso_env)
-        .ok()
-        .flatten()
-        .map(|session| session.cookie_header_value())
-}
-
 pub fn sso_auth_provider(auth_manager: Option<&AuthManager>) -> Option<SharedAuthProvider> {
-    sso_cookie(auth_manager)
-        .map(|cookie| Arc::new(CookieAuthProvider::new(cookie)) as SharedAuthProvider)
+    let auth_manager = auth_manager?;
+    // TODO(xiaohongshu): after startup, fetch the latest API key from backend and
+    // persist it into local config, then continue reading credentials from config.
+    auth_manager
+        .auth_cached()
+        .map(|auth| auth_provider_from_auth(&auth))
 }
 
 pub(crate) fn apply_sso_provider_override(
@@ -92,7 +85,7 @@ pub(crate) fn apply_sso_provider_override(
     auth_manager: Option<&AuthManager>,
     api_provider: &mut Provider,
 ) {
-    if provider.uses_internal_sso_auth() && sso_cookie(auth_manager).is_some() {
+    if provider.uses_internal_sso_auth() && sso_auth_provider(auth_manager).is_some() {
         api_provider.base_url = SsoConfig::for_env(current_sso_env()).responses_api_base_url;
     }
 }
@@ -158,6 +151,7 @@ pub fn auth_provider_from_auth(auth: &CodexAuth) -> SharedAuthProvider {
 mod tests {
     use codex_model_provider_info::WireApi;
     use codex_model_provider_info::create_oss_provider_with_base_url;
+    use pretty_assertions::assert_eq;
 
     use super::*;
 
@@ -168,5 +162,20 @@ mod tests {
         let auth = resolve_provider_auth(/*auth*/ None, &provider).expect("auth should resolve");
 
         assert!(auth.to_auth_headers().is_empty());
+    }
+
+    #[test]
+    fn sso_auth_provider_reads_api_key_from_auth_manager() {
+        let auth_manager = AuthManager::from_auth_for_testing(CodexAuth::from_api_key("sk-test"));
+        let auth = sso_auth_provider(Some(auth_manager.as_ref()))
+            .expect("sso auth provider should resolve from auth manager");
+
+        let headers = auth.to_auth_headers();
+        assert_eq!(
+            headers
+                .get(http::header::AUTHORIZATION)
+                .and_then(|h| h.to_str().ok()),
+            Some("Bearer sk-test")
+        );
     }
 }
