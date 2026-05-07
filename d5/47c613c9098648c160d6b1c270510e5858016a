@@ -1,0 +1,76 @@
+config.toml.example
+  h_7682562f57a3e3 10-11
+代码导读.md
+  820c5da3847afc1c 77-80
+  b8d307dbdba281f7 8-11,13,19,25,37,39-41,43-46,52,54,58,85,89,93-119,121,123-129,131,138-146,148,150,152,157-159,161-167,171,189-194,196-202
+  203a0042f5c9bab2 2,4,7,17,20-21,23,27-31,33,48,55-56,60-61,64-66,68,72,74,76,81-83,86-88,91-92,154,173-183,185,205-212
+Modifications.md
+  s_c48818784e0dec::t_a306aece8fa490 14,16-19,21-25
+  s_c48818784e0dec::t_79ff3b70d82179 227-242
+  s_c48818784e0dec::t_6cb71acd02ee8c 263
+  s_c48818784e0dec::t_9491bea8e89939 93
+  s_c48818784e0dec::t_3ca13f5c0bb58d 172-173
+codex-rs/model-provider/src/auth.rs
+  s_c48818784e0dec::t_da872256ba7431 75-80,88,154,166-174,178-179
+  s_c48818784e0dec::t_ddfbdf2627b250 175-177
+codex-rs/core/src/mcp_openai_file.rs
+  s_c48818784e0dec::t_c12e2273b3a6da 121
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "d547c613c9098648c160d6b1c270510e5858016a",
+  "prompts": {
+    "203a0042f5c9bab2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_240c7f35effeaIDdpMH4EhpkQF",
+        "model": "github-copilot/claude-opus-4.7"
+      },
+      "human_author": "白明强",
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 38,
+      "overriden_lines": 3
+    },
+    "820c5da3847afc1c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_240c7f35effeaIDdpMH4EhpkQF-89cfe68c-f510-4f01-8eef-ec907858f2bc",
+        "model": "unknown"
+      },
+      "human_author": "白明强",
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 2
+    },
+    "b8d307dbdba281f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_240c7f35effeaIDdpMH4EhpkQF-a483d694-ebd2-4ca0-b2b3-c2d05734c27c",
+        "model": "unknown"
+      },
+      "human_author": "白明强",
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 51,
+      "overriden_lines": 35
+    }
+  },
+  "humans": {
+    "h_7682562f57a3e3": {
+      "author": "白明强"
+    }
+  },
+  "sessions": {
+    "s_c48818784e0dec": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e01b1-c5eb-72f1-92e8-ec7e0ac355a6",
+        "model": "gpt-5.3-codex"
+      },
+      "human_author": "白明强 <baimingqiang1@xiaohongshu.com>"
+    }
+  }
+}
