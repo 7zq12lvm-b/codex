@@ -44,6 +44,7 @@ CLI_NAME="codex-cli"
 CARGO_BIN_NAME="codex"
 OSS_PATH="oss://lsh-oss-it-log/codex"
 OSS_CDN_BASE="https://lsh-oss-it-log.oss-cn-shanghai.aliyuncs.com/codex"
+OSS_REGION="${OSS_REGION:-cn-shanghai}"
 
 VERSION_PATCH_ACTIVE=false
 VERSION_PATCH_BAK=""
@@ -60,6 +61,15 @@ ALL_TARGETS=(
 log_info()  { echo -e "\033[32m[INFO]\033[0m  $*"; }
 log_warn()  { echo -e "\033[33m[WARN]\033[0m  $*"; }
 log_error() { echo -e "\033[31m[ERROR]\033[0m $*"; }
+
+oss_cp() {
+    ossutil cp "$@" --region "$OSS_REGION"
+}
+
+oss_set_public_read() {
+    # ossutil v2 将 set-acl 合并为 set-props 子命令，使用显式 --acl 兼容当前版本。
+    ossutil set-props "$1" --acl public-read --force --region "$OSS_REGION"
+}
 
 patch_workspace_version_for_full() {
     local version="$1"
@@ -321,12 +331,12 @@ upload_one() {
     log_info "上传 ${archive} -> OSS ..."
 
     # 上传版本号归档
-    ossutil cp "/tmp/${archive}" "$oss_versioned" --force
-    ossutil set-acl "$oss_versioned" public-read
+    oss_cp "/tmp/${archive}" "$oss_versioned" --force
+    oss_set_public_read "$oss_versioned"
 
     # 上传 latest 链接 (覆盖)
-    ossutil cp "/tmp/${archive}" "$oss_latest" --force
-    ossutil set-acl "$oss_latest" public-read
+    oss_cp "/tmp/${archive}" "$oss_latest" --force
+    oss_set_public_read "$oss_latest"
 
     log_info "上传完成:"
     log_info "  版本: ${OSS_CDN_BASE}/${archive}"
@@ -362,12 +372,12 @@ upload_scripts() {
     fi
 
     log_info "上传 install-codex-cli.sh -> OSS ..."
-    ossutil cp "$install_script" "$oss_install_script" --force
-    ossutil set-acl "$oss_install_script" public-read
+    oss_cp "$install_script" "$oss_install_script" --force
+    oss_set_public_read "$oss_install_script"
 
     log_info "上传 model_catalog.json -> OSS ..."
-    ossutil cp "$model_catalog" "$oss_model_catalog" --force
-    ossutil set-acl "$oss_model_catalog" public-read
+    oss_cp "$model_catalog" "$oss_model_catalog" --force
+    oss_set_public_read "$oss_model_catalog"
 
     log_info "脚本文件上传完成:"
     log_info "  安装脚本: ${OSS_CDN_BASE}/install-codex-cli.sh"

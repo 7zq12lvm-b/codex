@@ -1,3 +1,213 @@
+# Internal Fork Context (Xiaohongshu) / 内部分支背景（先读）
+
+> This repository is an **internal modified fork** based on upstream `openai/codex` and is **not** a clean mirror.
+> 本仓库是基于 upstream 的内部改造分支，不是纯同步镜像。
+
+## 0. Scope and intent / 作用范围
+
+- Keep pulling upstream changes, but preserve intentional internal divergence in auth, packaging, installer defaults, and scripts.
+- Future merges/rebases must treat this divergence as deliberate, not accidental drift.
+
+## 1. Desktop GUI reality (closed source) / 桌面 GUI 现实（闭源）
+
+- `codex app`/`codex-cli ... app` only acts as launcher/installer.
+- The GUI itself is a closed-source desktop app bundle (`/Applications/Codex.app`).
+- After GUI starts, it launches its own bundled runtime binary, typically:
+  - `/Applications/Codex.app/Contents/Resources/codex app-server --analytics-default-enabled`
+- Therefore, GUI runtime execution does **not** directly run the local custom `codex-cli` binary.
+
+### 1.1 Practical startup flow / 实际启动链路
+
+1. User runs launcher command: `codex app` or `codex-cli --env <env> app`.
+2. Launcher opens/installs Codex Desktop app.
+3. GUI process starts (`/Applications/Codex.app/Contents/MacOS/Codex`).
+4. GUI spawns bundled app-server binary under app bundle resources.
+
+### 1.2 Runtime verification guidance / 运行时核验指引
+
+- Verify process path with `ps/pgrep`:
+  - look for `.../Contents/Resources/codex app-server ...`
+- Verify which config/state files are opened with `lsof -p <pid>`:
+  - look for `~/.codex/config.toml`, sqlite, sessions, etc.
+- Verify outbound connection target with `lsof -nP -a -p <pid> -iTCP -sTCP:ESTABLISHED` and desktop logs.
+
+### 1.3 Observed behavior in this repo context / 本仓库场景下的已观测事实
+
+- Bundled GUI app-server process path observed:
+  - `/Applications/Codex.app/Contents/Resources/codex app-server --analytics-default-enabled`
+- It opened config/state under `~/.codex`, including:
+  - `~/.codex/config.toml`
+  - `~/.codex/state_*.sqlite*`
+  - `~/.codex/logs_*.sqlite*`
+  - `~/.codex/sessions/.../rollout-*.jsonl`
+- Local `~/.codex/config.toml` values influence runtime behavior (provider/base_url/auth-related settings).
+- So the operational model is:
+  - **Binary source** = GUI bundled closed-source runtime
+  - **Behavior/config source** = local `~/.codex` runtime config/state
+
+## 2. Internal modifications (canonicalized from former Modifications.md) / 内部改造总览
+
+### 2.1 Authentication direction (historical notes must be read together)
+
+There are two historical snapshots in branch docs; keep both for maintenance context:
+
+- Snapshot A (from earlier internal notes): login first, then API key from config file; internal login decoupled from upstream `requires_openai_auth` gating.
+- Snapshot B (from code-guide snapshot): internal SSO + cookie provider path emphasized.
+
+When touching auth, validate **current code truth** in these modules before changing behavior:
+
+- `codex-rs/login/src/sso_config.rs`
+- `codex-rs/login/src/sso_login.rs`
+- `codex-rs/login/src/auth/manager.rs`
+- `codex-rs/model-provider/src/auth.rs`
+- `codex-rs/model-provider/src/provider.rs`
+- `codex-rs/model-provider/src/models_endpoint.rs`
+- If present in current branch: `codex-rs/model-provider/src/cookie_auth_provider.rs`
+
+### 2.2 Internal login conflict isolation strategy
+
+To reduce repeated upstream merge conflicts in high-churn login files:
+
+- Keep `codex-rs/cli/src/login.rs` as close to upstream as practical.
+- Put internal SSO entry behavior in `codex-rs/cli/src/login_sso_internal.rs`.
+- Export internal login/status/logout through `codex-rs/cli/src/lib.rs`.
+
+Current expected exported entry names include:
+
+- `run_sso_login`
+- `run_login_status`
+- `run_logout`
+
+### 2.3 CLI behavior and env
+
+- CLI login default path should use internal SSO wiring where this branch enables it.
+- `--env` (e.g. `prod/sit`) is part of runtime SSO environment selection in this fork.
+
+### 2.4 Distribution naming policy
+
+- Upstream Cargo binary remains `codex` (crate `codex-cli`).
+- Internal distribution intentionally ships/installs as `codex-cli`.
+- This rename is done in packaging/installer layer (scripts), not by changing upstream Rust bin target naming.
+
+Primary files:
+
+- `xhs.sh`
+- `install-codex-cli.sh`
+
+### 2.5 Config directory policy
+
+- Config directory remains lowercase `~/.codex`.
+- Do not change to `~/.Codex` unless explicitly planned and fully migrated.
+
+### 2.6 Provider semantics
+
+- Provider is still meaningful (routing/base_url/catalog/runtime behavior), even when auth source strategy is customized.
+- Do not treat provider config as dead code.
+
+## 3. Module-level divergence snapshot / 模块差异快照
+
+> This is a maintenance map; always confirm with `git diff origin/main...HEAD` before risky refactors.
+
+### 3.1 CLI
+
+- `M codex-rs/cli/src/lib.rs`
+- `A codex-rs/cli/src/login_sso_internal.rs`
+- `M codex-rs/cli/src/main.rs`
+
+### 3.2 Login
+
+- `M codex-rs/login/src/auth/manager.rs`
+- `M codex-rs/login/src/lib.rs`
+- `A codex-rs/login/src/sso_config.rs`
+- `A codex-rs/login/src/sso_login.rs`
+
+### 3.3 Model Provider
+
+- `M codex-rs/model-provider-info/src/lib.rs`
+- `M codex-rs/model-provider/src/auth.rs`
+- `M codex-rs/model-provider/src/lib.rs`
+- `M codex-rs/model-provider/src/models_endpoint.rs`
+- `M codex-rs/model-provider/src/provider.rs`
+- Historical note: some snapshots include `A codex-rs/model-provider/src/cookie_auth_provider.rs`
+
+### 3.4 TUI
+
+- Internal auth/status integration touched `tui/src/lib.rs`, `tui/src/app.rs`, `tui/src/chatwidget.rs` and related tests/snapshots.
+
+### 3.5 Scripts / Distribution / Other
+
+- `A xhs.sh`
+- `A install-codex-cli.sh`
+- `A model_catalog.json`
+- `M codex-rs/codex-api/src/auth.rs`
+- `M codex-rs/core/src/mcp_openai_file.rs`
+
+## 4. Recommended reading path (from 代码导读 + Modifications) / 推荐阅读顺序
+
+1. Entry and routing:
+   - `codex-rs/cli/src/main.rs`
+   - `codex-rs/cli/src/lib.rs`
+   - `codex-rs/cli/src/login_sso_internal.rs`
+2. Auth implementation:
+   - `codex-rs/login/src/sso_config.rs`
+   - `codex-rs/login/src/sso_login.rs`
+   - `codex-rs/login/src/auth/manager.rs`
+3. Provider/auth propagation:
+   - `codex-rs/model-provider/src/auth.rs`
+   - `codex-rs/model-provider/src/provider.rs`
+   - `codex-rs/model-provider/src/models_endpoint.rs`
+   - `codex-rs/model-provider/src/cookie_auth_provider.rs` (if present)
+4. UI behavior:
+   - `codex-rs/tui/src/lib.rs`
+   - `codex-rs/tui/src/app.rs`
+   - `codex-rs/tui/src/chatwidget.rs`
+5. Packaging/install:
+   - `xhs.sh`
+   - `install-codex-cli.sh`
+   - `model_catalog.json`
+
+## 5. Merge/maintenance guardrails / 维护与合并指引
+
+1. Prefer extending internal logic in `login_sso_internal.rs` over editing upstream high-churn `login.rs`.
+2. During upstream sync, verify `cli/src/lib.rs` exports still point to intended internal handlers.
+3. After auth-chain changes, at minimum run:
+   - `cd codex-rs && just fmt`
+   - `cd codex-rs && cargo test -p codex-cli`
+4. Keep rollback steps file-scoped; avoid bundling unrelated behavior changes in one rollback commit.
+
+## 6. Rollback map / 回滚地图
+
+1. Auth rollback:
+   - Revert internal login/config callsites and restore upstream wiring for CLI/TUI/model-provider entrypoints.
+   - Primary files:
+     - `codex-rs/cli/src/login_sso_internal.rs`
+     - `codex-rs/login/src/sso_config.rs`
+     - `codex-rs/login/src/sso_login.rs`
+2. Distribution naming rollback:
+   - Revert `codex-cli` packaging/install naming in `xhs.sh` and `install-codex-cli.sh`.
+3. Config-path rollback (careful):
+   - Audit all `~/.codex` references before changing directory policy.
+4. Safe rollback procedure:
+   - Use file-scoped revert commits.
+   - Re-run formatting/tests for touched crates.
+   - Validate installer behavior separately.
+
+## 7. 30-minute onboarding (from 代码导读) / 新同学 30 分钟上手
+
+- 0-5 min:
+  - `README.md`
+  - This `AGENTS.md` section (internal fork context)
+- 5-12 min:
+  - CLI login routing (`main.rs`, `lib.rs`, `login_sso_internal.rs`)
+- 12-20 min:
+  - Auth/provider chain (`sso_config.rs`, `sso_login.rs`, provider auth files)
+- 20-26 min:
+  - TUI consumption of auth state (`tui/src/lib.rs`, `app.rs`, `chatwidget.rs`)
+- 26-30 min:
+  - Packaging/install chain (`xhs.sh`, `install-codex-cli.sh`, `model_catalog.json`)
+
+---
+
 # Rust/codex-rs
 
 In the codex-rs folder where the rust code lives:
